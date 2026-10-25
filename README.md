@@ -29,7 +29,7 @@ cp .env.example .env            # then put your DeepSeek key in DEEPSEEK_API_KEY
 cd backend
 uv sync                         # installs Python 3.12 + dependencies
 uv run python scripts/seed_db.py   # creates data/demo.db (fake stock data)
-uv run pytest                   # 226 offline tests, no API key needed (-m integration: real Feishu/Sina/OpenAI checks)
+uv run pytest                   # 253 offline tests, no API key needed (-m integration: real Feishu/Sina/OpenAI checks)
 ```
 
 ### Other models
@@ -164,6 +164,18 @@ Like Feishu, it polls Telegram over an outbound connection: no public URL. Desig
 
 Groups work as in Feishu: add the bot (or `@bot /enable`), then @mention it.
 
+### WeCom / 企业微信 bot (optional, about 10 minutes)
+
+A WeCom **smart robot (智能机器人)** over its **long connection**: like Feishu, the server connects out, so no public URL or tunnel is needed. Answers arrive as **one message that grows while the agent works** (each tool call, then the answer). Design: [`../design/wecom_integration.md`](../design/wecom_integration.md).
+
+1. Web admin console (https://work.weixin.qq.com/wework_admin): **安全与管理 → 管理工具 → 智能机器人 → 创建机器人 → 手动创建**, enter a name, then scroll to the very bottom and click the **API模式创建** link (the client app's 工作台 / Workspace only offers the standard, no-code bot).
+2. Under API 配置 choose **使用长连接 (long connection)**, and copy the **Bot ID** and **Secret** (shown once; can be regenerated on the bot's page) into `.env` as `WECOM_BOT_ID` / `WECOM_BOT_SECRET`. Set the visible range (可见范围) to include you, then **保存**.
+3. Add `wecom` to `IM_CHANNELS` and start `agent-demo-server`; the log shows `WeCom connected`.
+4. Message the bot in WeCom. It is in setup mode and logs `user_id=…`; put that in `WECOM_ALLOWED_USERS` (and `claude.owner.wecom` in `agent.properties` for `/claude` and scheduled tasks), restart.
+5. Groups: add the bot to a group, then send `@bot /enable` (WeCom has no "bot added" event, so groups are never enabled automatically). Don't enable groups with external WeChat contacts: everyone there can read the answers.
+
+Approvals are a card with **Approve / Deny**; after a click the card shows ✅ / ❌. Voice messages work: WeCom transcribes them. Run **one** server at a time: a second connection takes the bot over, and the first one logs this and stops.
+
 ## 2. Run
 
 **CLI**
@@ -193,6 +205,13 @@ The server listens on **localhost only**, because it has no login and the agent 
 - *Summarise my trades by symbol: total bought, sold and average price.*
 - *Find my last 3 emails from GitHub and summarise them.* (Gmail)
 - *Email me (my-address@gmail.com) a table of my watchlist with the latest close prices.* An approval prompt appears; try both **Deny** and **Approve**.
+
+### On the Tencent Cloud VM (24/7)
+
+The Feishu and WeCom bots run on the VM (`/srv/agents/agent-demo`, port 8101 on localhost, its own
+user and systemd unit next to Hermes). Deploy and update with `deploy/deploy.sh`; see
+`deploy/README.md` and `design/deployment.md`. **On the laptop, keep `IM_CHANNELS=telegram`**: one bot
+must never run on two machines. `AGENT_PORT` sets the web server's port (default 8000).
 
 ---
 

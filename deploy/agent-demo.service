@@ -1,0 +1,38 @@
+# agent-demo on the shared VM (design/deployment.md §2.1). Installed by `deploy/deploy.sh bootstrap`.
+[Unit]
+Description=agent-demo (Qwen assistant: Feishu, WeCom, web UI on localhost)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=agent-demo
+Group=agent-demo
+WorkingDirectory=/srv/agents/agent-demo/backend
+Environment=AGENT_PORT=8101
+Environment=UV_CACHE_DIR=/srv/agents/agent-demo/.cache/uv
+Environment=UV_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple/
+Environment=HOME=/srv/agents/agent-demo
+ExecStart=/usr/local/bin/uv run --frozen --no-sync agent-demo-server
+Restart=on-failure
+RestartSec=5
+
+# Isolation
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/agents/agent-demo
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077
+# Resources
+MemoryMax=1G
+CPUQuota=100%
+TasksMax=256
+
+[Install]
+WantedBy=multi-user.target

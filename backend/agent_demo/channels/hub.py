@@ -38,7 +38,7 @@ from ..router import Route, route
 from ..runtime import Runtime
 from ..tools import Tool
 from . import render
-from .base import ButtonPress, Channel, GroupEvent, IncomingMessage
+from .base import ButtonPress, Channel, GroupEvent, IncomingMessage, Stream
 from .groups import GroupStore
 
 log = logging.getLogger("agent_demo.im")
@@ -60,6 +60,8 @@ GROUP_WELCOME = (
     "Send @me /disable to turn me off here."
 )
 HISTORY_DEFAULT, HISTORY_MAX, HISTORY_TEXT_CHARS = 30, 100, 500
+WAITING_LINE = "⏳ Waiting for your approval (see below)"
+APPROVAL_LINES = {"approved": "✅ Approved", "denied": "❌ Denied", "expired": "⌛ Expired (no answer within 5 minutes)"}
 # Added to the system prompt of group sessions (design §12.9).
 GROUP_CHAT_PROMPT = """
 You are answering in a group chat. Your conversation history contains only the messages that
@@ -97,6 +99,8 @@ class ChatSession:
     reply_to: str | None = None  # thread replies under the user's message (groups)
     last_active: float = field(default_factory=time.monotonic)
     _progress: list[str] = field(default_factory=list)
+    stream: Stream | None = None  # the turn's growing message, on channels that offer open_stream
+    _transcript: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         runtime = self.hub.runtime
@@ -196,22 +200,74 @@ class ChatSession:
             lines, self._progress = self._progress, []
             await self.say("\n".join(lines))
 
+    # ---- streamed turns (design/wecom_integration.md §4) ----------------------
+
+    async def open_stream(self, message_id: str | None) -> None:
+        opener = getattr(self.channel, "open_stream", None)
+        self.stream, self._transcript = None, []
+        if opener is None or message_id is None:
+            return
+        try:
+            self.stream = await opener(self.chat_id, message_id)
+        except Exception:  # noqa: BLE001 - fall back to separate messages
+            log.exception("%s: opening a stream failed", self.channel.name)
+
+    def _stream_text(self) -> str:
+        return "\n".join(self._transcript)
+
+    async def _stream_push(self) -> None:
+        """Send the transcript; past the size limit, freeze the stream and go on with separate messages."""
+        text = self._stream_text()
+        if len(text.encode()) > self.stream.max_bytes:
+            last = self._transcript.pop()
+            await self.close_stream()
+            await self.say(last)
+            return
+        try:
+            await self.stream.update(text)
+        except Exception:  # noqa: BLE001
+            log.exception("%s: updating the stream failed; sending separate messages", self.channel.name)
+            self.stream, self._transcript = None, []
+            await self.say(text)
+
+    async def _emit(self, line: str, buffered: bool = False) -> None:
+        """One piece of turn output: into the stream, else buffered (progress) or sent at once."""
+        if self.stream is not None:
+            self._transcript.append(line)
+            await self._stream_push()
+        elif buffered:
+            self._progress.append(line)
+        else:
+            await self.flush()
+            await self.say(line)
+
+    async def close_stream(self) -> None:
+        stream, self.stream = self.stream, None
+        text, self._transcript = self._stream_text(), []
+        if stream is None:
+            return
+        try:
+            await stream.finish(text)
+        except Exception:  # noqa: BLE001
+            log.exception("%s: finishing the stream failed", self.channel.name)
+
     # ---- EventSink ----------------------------------------------------------
 
     async def sink(self, event: Event) -> None:
         if isinstance(event, ToolCallEvent):
             args = render.short_args(event.arguments)
-            self._progress.append(f"🔧 {event.name} · {args}" if args else f"🔧 {event.name}")
+            await self._emit(f"🔧 {event.name} · {args}" if args else f"🔧 {event.name}", buffered=True)
         elif isinstance(event, ToolResultEvent):
             if event.is_error:
-                self._progress.append(f"  ✗ {render.shorten(event.result, 120)}")
+                await self._emit(f"  ✗ {render.shorten(event.result, 120)}", buffered=True)
         elif isinstance(event, AssistantText):
             if event.text.strip():  # reasoning is never sent to chats
-                await self.flush()
-                await self.say(event.text)
+                if self.stream is not None:
+                    await self._emit(("\n" if self._transcript else "") + render.tables_to_code(event.text))
+                else:
+                    await self._emit(event.text)
         elif isinstance(event, ErrorEvent):
-            await self.flush()
-            await self.say(f"⚠ {event.message}")
+            await self._emit(f"⚠ {event.message}")
         elif isinstance(event, TurnDone):
             await self.flush()
             log.info(
@@ -223,6 +279,9 @@ class ChatSession:
 
     async def approve(self, request: ApprovalRequest) -> bool:
         await self.flush()
+        streamed = self.stream is not None
+        if streamed:
+            await self._emit(WAITING_LINE)
         pending = PendingApproval(asyncio.get_running_loop().create_future(), request)
         self.pending[request.id] = pending  # registered before sending: a fast click still finds it
         try:
@@ -239,6 +298,9 @@ class ChatSession:
             approved, outcome = False, "expired"
         finally:
             self.pending.pop(request.id, None)
+        if streamed and self.stream is not None and WAITING_LINE in self._transcript:
+            self._transcript[self._transcript.index(WAITING_LINE)] = APPROVAL_LINES[outcome]
+            await self._stream_push()
         try:
             await self.channel.close_approval(self.chat_id, pending.handle, outcome)
         except Exception:  # noqa: BLE001
@@ -513,7 +575,7 @@ class ChatHub:
             if session.busy():
                 await session.say("Still working on your last message… (answer the approval request if there is one)")
                 return
-            session.turn = asyncio.create_task(self._run_turn(session, text))
+            session.turn = asyncio.create_task(self._run_turn(session, text, msg.message_id))
 
     async def _command(self, session: ChatSession, command: str, text: str) -> None:
         if command == "/tasks":
@@ -596,14 +658,17 @@ class ChatHub:
         session.agent.add_note(claude_code.memory_note(prompt, folder, result))  # memory bridge (§3)
         log.info("%s claude code: ok=%s, %d turns, %.0f s", session.key, result.ok, result.turns, result.seconds)
 
-    async def _run_turn(self, session: ChatSession, text: str) -> None:
+    async def _run_turn(self, session: ChatSession, text: str, message_id: str | None = None) -> None:
+        await session.open_stream(message_id)  # one growing reply, if the channel can (WeCom)
         try:
             await session.agent.run_turn(text, context=await session.recent_context())
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001 - report instead of dying silently
             log.exception("%s: agent turn failed", session.key)
-            await session.say(f"⚠ Something went wrong: {exc}")
+            await session._emit(f"⚠ Something went wrong: {exc}")
+        finally:
+            await session.close_stream()
 
     async def on_button(self, press: ButtonPress) -> str:
         """Handle an Approve/Deny click. Returns a short notice for the clicker (a toast)."""

@@ -1,4 +1,4 @@
-"""What every IM channel (Feishu now, WhatsApp later) exchanges with the ChatHub.
+"""What every IM channel (Feishu, WhatsApp, WeCom) exchanges with the ChatHub.
 
 A channel only translates: platform events -> IncomingMessage / ButtonPress, and
 send_text / send_approval / close_approval -> platform API calls. Everything else
@@ -85,3 +85,16 @@ class Channel(Protocol):
     # Optional (design §12): channels that can read a group's history define
     #   async def history(self, chat_id: str, limit: int, since: datetime | None) -> list[HistoryLine]
     # returning up to `limit` of the most recent messages, oldest first.
+    #
+    # Optional (design/wecom_integration.md §4): channels that can show a turn as one growing message define
+    #   async def open_stream(self, chat_id: str, message_id: str) -> Stream | None
+    # (None = cannot stream for this message; the hub then sends separate messages as usual).
+
+
+class Stream(Protocol):
+    """One message that is updated while the agent works, then frozen."""
+
+    max_bytes: int  # longer turns finish the stream and continue with send_text
+
+    async def update(self, text: str) -> None: ...  # the full text so far, not a delta
+    async def finish(self, text: str) -> None: ...  # the final text; no updates after this

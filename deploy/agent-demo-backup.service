@@ -1,0 +1,15 @@
+# Daily backup of agent-demo's state (design/deployment.md §9 step 10).
+[Unit]
+Description=Back up agent-demo state, data and config
+
+[Service]
+Type=oneshot
+User=agent-demo
+Group=agent-demo
+ExecStart=/srv/agents/agent-demo/deploy/backup.sh
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/agents/agent-demo/backups
+PrivateTmp=true
+UMask=0077

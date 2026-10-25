@@ -361,6 +361,14 @@ if _dist.exists():
     app.mount("/", WebUIFiles(directory=_dist, html=True), name="web")
 
 
+def server_port() -> int:
+    """AGENT_PORT, so several agents can share one machine (design/deployment.md §4). Default 8000."""
+    value = os.environ.get("AGENT_PORT", "").strip() or "8000"
+    if not value.isdigit() or not 1 <= int(value) <= 65535:
+        raise SystemExit(f"AGENT_PORT must be a port number (1-65535), not {value!r}")
+    return int(value)
+
+
 def main() -> None:
     import argparse
 
@@ -382,4 +390,4 @@ def main() -> None:
         app_log.propagate = False
 
     # Localhost only: there is no login, and this agent can send email.
-    uvicorn.run("agent_demo.server:app", host="127.0.0.1", port=8000)
+    uvicorn.run("agent_demo.server:app", host="127.0.0.1", port=server_port())

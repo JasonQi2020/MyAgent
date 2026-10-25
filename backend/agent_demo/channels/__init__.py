@@ -1,6 +1,7 @@
-"""IM channels: Feishu, WhatsApp and Telegram. See design/im_integration.md, whatsapp_ and telegram_integration.md.
+"""IM channels: Feishu, WhatsApp, WeCom and Telegram. See design/im_integration.md and
+whatsapp_ / wecom_ / telegram_integration.md.
 
-Enable with e.g. IM_CHANNELS=feishu,telegram in .env. Adding a platform = one module with a Channel
+Enable with e.g. IM_CHANNELS=feishu,wecom in .env. Adding a platform = one module with a Channel
 class (see base.py) + one line in CHANNELS.
 """
 
@@ -16,6 +17,7 @@ from .base import Channel
 CHANNELS = {
     "feishu": "agent_demo.channels.feishu:FeishuChannel",
     "whatsapp": "agent_demo.channels.whatsapp:WhatsAppChannel",
+    "wecom": "agent_demo.channels.wecom:WeComChannel",
     "telegram": "agent_demo.channels.telegram:TelegramChannel",
 }
 

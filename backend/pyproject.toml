@@ -14,6 +14,7 @@ dependencies = [
     "httpx>=0.28",
     "claude-agent-sdk>=0.2.174",
     "croniter>=6.2.4",
+    "websockets>=13,<16",  # WeCom client; lark-oapi pins <16
 ]
 
 [project.scripts]

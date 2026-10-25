@@ -1,0 +1,6 @@
+#!/bin/sh
+# The agent-demo CLI on the VM, as the agent-demo user (design/deployment.md §8):
+#   sudo -u agent-demo /srv/agents/agent-demo/deploy/agent-demo-cli
+# It starts its own runtime without IM channels, so it never clashes with the running service.
+export UV_CACHE_DIR=/srv/agents/agent-demo/.cache/uv HOME=/srv/agents/agent-demo
+cd /srv/agents/agent-demo/backend && exec /usr/local/bin/uv run --frozen --no-sync agent-demo "$@"

@@ -251,6 +251,8 @@ New file `channels/whatsapp.py` implementing `Channel` (Cloud API: webhook via `
 
 > **Detailed design:** [`whatsapp_integration.md`](whatsapp_integration.md) (implemented 2026-10-24): DMs only; adds one small guard middleware to `server.py` so the tunnel cannot reach `/ws`.
 
+> **WeCom (企业微信):** [`wecom_integration.md`](wecom_integration.md) (implemented 2026-10-25): smart robot over a long connection (no public URL), DMs + group @mentions.
+
 ---
 
 ## 10. Implementation notes (2026-10-24)

@@ -14,7 +14,7 @@
 | G3 | An **MCP client** that connects to a Gmail MCP server | The MCP protocol, discovering tools at runtime, combining local and remote tools |
 | G4 | **Human approval** for risky actions (sending or deleting email) | Safety and permission design |
 | G5 | **Two user interfaces** on one Python core: a **CLI** and a **TypeScript web UI** | Separating the core from the UI; an event protocol over WebSocket |
-| G6 | **IM channels**: chat with the agent from **Feishu** and **WhatsApp** (DMs only) ([`im_integration.md`](im_integration.md), [`whatsapp_integration.md`](whatsapp_integration.md)) | Channel adapters, webhooks vs. long connections, per-chat sessions, approvals with buttons |
+| G6 | **IM channels**: chat with the agent from **Feishu** and **WhatsApp** (DMs only) and **WeCom** ([`im_integration.md`](im_integration.md), [`whatsapp_integration.md`](whatsapp_integration.md), [`wecom_integration.md`](wecom_integration.md)) | Channel adapters, webhooks vs. long connections, per-chat sessions, approvals with buttons |
 | G7 | **Choice of mailbox**: Sina Mail (default) or Gmail, set in `agent.properties` ([`mail_provider.md`](mail_provider.md)) | Provider profiles, config vs. secrets, IMAP/SMTP vs. OAuth APIs |
 
 **Non-goals for the demo**: memory and skills, context compaction, multi-user accounts (IM channels use a fixed allowlist of users instead; see [`im_integration.md`](im_integration.md) §4), authentication for the web UI, production deployment, trading. These come later; see `summary.md` stages 2–6.
@@ -381,6 +381,7 @@ Each milestone runs on its own. Read and try it before moving on.
 | M8 | `channels/base.py` + `render.py` + a fake channel in the tests | Channel adapters, per-chat sessions, rendering for IM |
 | M9 | Feishu adapter (long connection, approval cards) | Event subscriptions without a public URL, interactive cards |
 | M10 | WhatsApp adapter, DMs only (webhook, signature check, reply buttons; [`whatsapp_integration.md`](whatsapp_integration.md)) | Public webhooks, request signing, platform messaging rules |
+| M11 | WeCom adapter (smart robot long connection, own WebSocket client, template cards; [`wecom_integration.md`](wecom_integration.md)) | Writing a protocol client: subscribe, heartbeat, reconnect, request/response by id |
 | (Exercises) | Streaming, parallel tool calls, saving history in SQLite, your own Gmail MCP server in Python | Next steps toward `summary.md` stages 2–4 |
 
 ---
