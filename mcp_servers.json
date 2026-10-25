@@ -1,0 +1,35 @@
+{
+  "servers": {
+    "sina": {
+      "role": "mail",
+      "command": "${PYTHON}",
+      "args": ["-m", "mail_mcp.imap_server"],
+      "env": {
+        "EMAIL_USER": "${mail.sina.address}",
+        "EMAIL_PASSWORD": "${SINA_AUTH_CODE}",
+        "IMAP_HOST": "${mail.sina.imap_host}",
+        "IMAP_PORT": "${mail.sina.imap_port}",
+        "SMTP_HOST": "${mail.sina.smtp_host}",
+        "SMTP_PORT": "${mail.sina.smtp_port}"
+      },
+      "auto_approve": ["list_folders", "search_emails", "read_email"],
+      "blocked": [],
+      "untrusted": true,
+      "startup_timeout": 30
+    },
+    "gmail": {
+      "role": "mail",
+      "command": "npx",
+      "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp@1.1.11"],
+      "auto_approve": [
+        "search_emails",
+        "read_email",
+        "list_email_labels",
+        "list_filters",
+        "get_filter"
+      ],
+      "blocked": [],
+      "untrusted": true
+    }
+  }
+}

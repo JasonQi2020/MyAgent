@@ -1,0 +1,10 @@
+.env
+data/
+logs/
+backend/.venv/
+__pycache__/
+.pytest_cache/
+web/node_modules/
+web/dist/
+.claude-sandbox/
+state/
