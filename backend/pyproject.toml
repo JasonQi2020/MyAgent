@@ -1,0 +1,40 @@
+[project]
+name = "agent-demo"
+version = "0.1.0"
+description = "Learning demo: hand-written agent loop + SQLite tools + Gmail MCP, with CLI and web UI"
+requires-python = ">=3.11"
+dependencies = [
+    "openai>=1.50",
+    "mcp>=1.2",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "python-dotenv>=1.0",
+    "rich>=13.7",
+    "lark-oapi>=1.7.5",
+    "httpx>=0.28",
+    "claude-agent-sdk>=0.2.174",
+    "croniter>=6.2.4",
+]
+
+[project.scripts]
+agent-demo = "agent_demo.cli:main"
+agent-demo-server = "agent_demo.server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agent_demo", "mail_mcp"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+# Integration tests are skipped in a full run; see tests/conftest.py.
+markers =["integration: calls a real external service (needs credentials and network)"]
